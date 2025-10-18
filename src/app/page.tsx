@@ -161,7 +161,7 @@ export default function Home() {
               transition={{ delay: 0.7 }}
               className="mt-16 flex flex-wrap gap-3 justify-center"
             >
-              {['Live Preview', 'Syntax Highlighting', 'Auto-save', 'Dark Mode', 'GFM Support'].map((feature, index) => (
+              {['Live Preview', 'Auto-save', 'Dark Mode', 'GFM Support'].map((feature, index) => (
                 <div
                   key={feature}
                   className="glass px-4 py-2 rounded-full text-sm font-medium border border-border/50"

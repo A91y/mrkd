@@ -48,6 +48,11 @@ body {
   overflow-x: hidden;
 }
 
+/* Preserve whitespace in textareas */
+textarea {
+  white-space: pre;
+}
+
 /* Subtle Animated Background */
 body::before {
   content: '';
@@ -273,6 +278,13 @@ html {
   color: var(--foreground);
 }
 
+.prose p,
+.prose li,
+.prose td,
+.prose th {
+  white-space: pre-wrap;
+}
+
 .prose h1,
 .prose h2,
 .prose h3,
@@ -300,6 +312,7 @@ html {
   border-radius: 0.375em;
   font-size: 0.875em;
   border: 1px solid var(--glass-border);
+  white-space: pre-wrap;
 }
 
 .prose pre {
@@ -310,6 +323,7 @@ html {
   overflow-x: auto;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  white-space: pre;
 }
 
 .prose pre code {
@@ -318,6 +332,7 @@ html {
   border-radius: 0;
   font-size: inherit;
   border: none;
+  white-space: pre;
 }
 
 .prose blockquote {
