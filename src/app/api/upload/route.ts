@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToS3, isS3Configured } from '@/lib/s3';
-import { generateId, validateContent, getShareUrl } from '@/lib/utils';
+import { generateId, validateContent, getShareUrl, createMetadata, appendMetadata, hashIP, hashEditKey } from '@/lib/utils';
 import { MESSAGES } from '@/lib/constants';
 
 // Simple in-memory rate limiting (use Redis in production)
@@ -41,8 +41,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting
+    // Get client IP
     const ip = request.headers.get('x-forwarded-for') || 'unknown';
+    
+    // Rate limiting
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
         {
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { content } = body;
+    const { content, name, isEncrypted, editKey } = body;
 
     // Validate content
     const validation = validateContent(content);
@@ -69,6 +71,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create metadata
+    const hashedIP = await hashIP(ip);
+    const metadata = createMetadata(name, hashedIP);
+    
+    // Set encryption flag
+    if (isEncrypted) {
+      metadata.is_encrypted = true;
+    }
+    
+    // Hash and store edit key if provided
+    if (editKey && editKey.trim()) {
+      const hashedEditKey = await hashEditKey(editKey.trim());
+      metadata.edit_key_hash = hashedEditKey;
+    }
+
+    // Append metadata to content
+    const contentWithMetadata = appendMetadata(content, metadata);
+
     // Generate unique ID (with collision check)
     let id = generateId();
     let attempts = 0;
@@ -77,7 +97,7 @@ export async function POST(request: NextRequest) {
     // In a production app, you'd check for collisions in a database
     // For now, we'll just generate a new ID if upload fails
     while (attempts < maxAttempts) {
-      const uploaded = await uploadToS3(id, content);
+      const uploaded = await uploadToS3(id, contentWithMetadata);
 
       if (uploaded) {
         const url = getShareUrl(id);

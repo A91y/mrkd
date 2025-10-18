@@ -133,3 +133,130 @@ export function debounce<T extends (...args: never[]) => void>(
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+/**
+ * Document Metadata Interface
+ */
+export interface DocumentMetadata {
+  created_at: string;
+  name?: string;
+  creator_ip: string;
+  is_encrypted: boolean;
+  edit_key_hash?: string;
+  version: string;
+}
+
+/**
+ * Hash IP address using SHA-256 (privacy-preserving)
+ */
+export async function hashIP(ip: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(ip);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Hash edit key using SHA-256
+ */
+export async function hashEditKey(key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(key);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Increment version string (e.g., "1.0" -> "1.1", "1.9" -> "2.0")
+ */
+export function incrementVersion(version: string): string {
+  const parts = version.split('.');
+  if (parts.length !== 2) return '1.1'; // Fallback for invalid versions
+  
+  let major = parseInt(parts[0], 10);
+  let minor = parseInt(parts[1], 10);
+  
+  minor++;
+  if (minor >= 10) {
+    major++;
+    minor = 0;
+  }
+  
+  return `${major}.${minor}`;
+}
+
+/**
+ * Create metadata object
+ */
+export function createMetadata(name?: string, creatorIP?: string): DocumentMetadata {
+  return {
+    created_at: new Date().toISOString(),
+    name: name || undefined,
+    creator_ip: creatorIP || 'unknown',
+    is_encrypted: false,
+    version: '1.0',
+  };
+}
+
+/**
+ * Encode metadata to base64
+ */
+export function encodeMetadata(metadata: DocumentMetadata): string {
+  const json = JSON.stringify(metadata);
+  return Buffer.from(json).toString('base64');
+}
+
+/**
+ * Decode metadata from base64
+ */
+export function decodeMetadata(base64: string): DocumentMetadata | null {
+  try {
+    const json = Buffer.from(base64, 'base64').toString('utf-8');
+    return JSON.parse(json) as DocumentMetadata;
+  } catch (error) {
+    console.error('Failed to decode metadata:', error);
+    return null;
+  }
+}
+
+/**
+ * Append metadata to markdown content (always as last line)
+ */
+export function appendMetadata(content: string, metadata: DocumentMetadata): string {
+  const base64 = encodeMetadata(metadata);
+  return `${content}\n\n<!-- META:${base64} -->`;
+}
+
+/**
+ * Extract metadata from markdown content (ONLY from last line)
+ * Returns { content: string, metadata: DocumentMetadata | null }
+ */
+export function extractMetadata(content: string): {
+  content: string;
+  metadata: DocumentMetadata | null;
+} {
+  // Split content into lines
+  const lines = content.split('\n');
+  
+  // Check if last line contains metadata
+  const lastLine = lines[lines.length - 1]?.trim() || '';
+  const metaRegex = /^<!-- META:([A-Za-z0-9+/=]+) -->$/;
+  const match = lastLine.match(metaRegex);
+
+  if (!match) {
+    // No valid metadata on last line, return content as-is
+    return { content, metadata: null };
+  }
+
+  // Extract and decode metadata from last line
+  const base64 = match[1];
+  const metadata = decodeMetadata(base64);
+  
+  // Remove last line (metadata) and any trailing empty lines
+  const contentLines = lines.slice(0, -1);
+  const cleanContent = contentLines.join('\n').trim();
+
+  return { content: cleanContent, metadata };
+}

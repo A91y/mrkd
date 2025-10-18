@@ -21,6 +21,10 @@ export interface FetchResponse {
   metadata?: {
     createdAt: string;
     size: number;
+    isEncrypted?: boolean;
+    isEditable?: boolean;
+    name?: string;
+    version?: string;
   };
   error?: string;
 }
@@ -43,8 +47,15 @@ export interface ThemeToggleProps {
 export interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onShare: () => void;
+  onShare: (encryptionKey?: string, documentName?: string, editKey?: string) => void;
   isUploading?: boolean;
+}
+
+export interface DecryptModalProps {
+  isOpen: boolean;
+  onDecrypt: (key: string) => void;
+  onCancel: () => void;
+  error?: string;
 }
 
 export interface MarkdownPreviewProps {
@@ -53,4 +64,10 @@ export interface MarkdownPreviewProps {
 
 export interface MarkdownViewerProps {
   content: string;
+  metadata?: {
+    name?: string;
+    isEditable?: boolean;
+    version?: string;
+  };
+  onEdit?: () => void;
 }

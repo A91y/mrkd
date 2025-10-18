@@ -9,15 +9,37 @@ import { MarkdownViewerProps } from '@/types';
 import CopyButton from './CopyButton';
 import 'highlight.js/styles/github-dark.css';
 
-export default function MarkdownViewer({ content }: MarkdownViewerProps) {
+export default function MarkdownViewer({ content, metadata, onEdit }: MarkdownViewerProps) {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Action buttons */}
-      <div className="flex items-center justify-between mb-6 glass-strong p-4 rounded-2xl border border-border/50">
-        <h1 className="text-2xl font-bold text-foreground">
-          Shared Markdown
-        </h1>
+      <div className="flex items-center justify-between mb-6 glass-strong p-4 rounded-2xl border border-border/50 flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {metadata?.name || 'Shared Markdown'}
+          </h1>
+          <div className="flex items-center gap-3 mt-1">
+            {metadata?.isEditable && (
+              <p className="text-xs text-muted-foreground">
+                🔑 Editable
+              </p>
+            )}
+            {metadata?.version && (
+              <p className="text-xs text-muted-foreground">
+                v{metadata.version}
+              </p>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-3">
+          {metadata?.isEditable && onEdit && (
+            <button
+              onClick={onEdit}
+              className="px-5 py-2 text-sm font-semibold glass hover-glow rounded-xl transition-all border border-border/50"
+            >
+              ✏️ Edit
+            </button>
+          )}
           <CopyButton text={content} label="Copy Source" />
           <Link
             href="/"

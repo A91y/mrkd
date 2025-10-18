@@ -7,6 +7,7 @@ import ShareModal from '@/components/ShareModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import GalaxyBackground from '@/components/GalaxyBackground';
 import { STORAGE_KEYS, MESSAGES } from '@/lib/constants';
+import { encryptContent, isCryptoSupported } from '@/lib/crypto';
 import type { UploadResponse } from '@/types';
 
 export default function Home() {
@@ -16,9 +17,28 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [error, setError] = useState('');
   const [showHero, setShowHero] = useState(true);
+  const [editSession, setEditSession] = useState<any>(null);
 
-  // Load draft from localStorage on mount
+  // Load draft from localStorage or edit session on mount
   useEffect(() => {
+    // Check for edit mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isEditMode = urlParams.get('edit') === 'true';
+    
+    if (isEditMode) {
+      const editSessionData = sessionStorage.getItem('editSession');
+      if (editSessionData) {
+        const session = JSON.parse(editSessionData);
+        setContent(session.content);
+        setEditSession(session);
+        setShowHero(false);
+        // Clear the URL parameter
+        window.history.replaceState({}, '', '/');
+        return;
+      }
+    }
+    
+    // Load draft if no edit session
     const draft = localStorage.getItem(STORAGE_KEYS.DRAFT);
     if (draft) {
       setContent(draft);
@@ -26,9 +46,15 @@ export default function Home() {
     }
   }, []);
 
-  const handleShare = async () => {
+  const handleShare = async (encryptionKey?: string, documentName?: string, editKey?: string) => {
     if (!content.trim()) {
       setError('Please enter some content before sharing');
+      return;
+    }
+
+    // Check crypto support if encryption is requested
+    if (encryptionKey && !isCryptoSupported()) {
+      setError('Encryption is not supported in your browser');
       return;
     }
 
@@ -36,27 +62,73 @@ export default function Home() {
     setError('');
 
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
+      let contentToUpload = content;
+      
+      // Encrypt content if key is provided
+      if (encryptionKey && encryptionKey.trim()) {
+        try {
+          contentToUpload = await encryptContent(content, encryptionKey.trim());
+        } catch (encryptError) {
+          setError('Failed to encrypt content');
+          setIsUploading(false);
+          return;
+        }
+      }
 
-      const data: UploadResponse = await response.json();
+      // Check if we're in edit mode
+      if (editSession) {
+        // Update existing document
+        const response = await fetch(`/api/update/${editSession.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            content: contentToUpload,
+            editKey: editSession.editKey,
+            isEncrypted: !!encryptionKey?.trim()
+          }),
+        });
 
-      if (data.success && data.url) {
-        setShareUrl(data.url);
-        setShowShareModal(true);
-        // Clear draft after successful share
-        localStorage.removeItem(STORAGE_KEYS.DRAFT);
+        const data = await response.json();
+
+        if (data.success) {
+          // Redirect to view page
+          window.location.href = `/view/${editSession.id}`;
+          // Clear edit session
+          sessionStorage.removeItem('editSession');
+        } else {
+          setError(data.error || 'Failed to update document');
+        }
       } else {
-        setError(data.error || MESSAGES.UPLOAD_ERROR);
+        // Create new document
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            content: contentToUpload,
+            isEncrypted: !!encryptionKey?.trim(),
+            name: documentName?.trim(),
+            editKey: editKey?.trim()
+          }),
+        });
+
+        const data: UploadResponse = await response.json();
+
+        if (data.success && data.url) {
+          setShareUrl(data.url);
+          setShowShareModal(true);
+          // Clear draft after successful share
+          localStorage.removeItem(STORAGE_KEYS.DRAFT);
+        } else {
+          setError(data.error || MESSAGES.UPLOAD_ERROR);
+        }
       }
     } catch (err) {
       console.error('Upload error:', err);
-      setError(MESSAGES.UPLOAD_ERROR);
+      setError(editSession ? 'Failed to update document' : MESSAGES.UPLOAD_ERROR);
     } finally {
       setIsUploading(false);
     }

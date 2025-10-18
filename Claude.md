@@ -96,7 +96,8 @@ mrkd/
 
 ```json
 {
-  "content": "# Markdown content here..."
+  "content": "# Markdown content here...",
+  "name": "Optional document name" // Optional
 }
 ```
 
@@ -114,9 +115,22 @@ mrkd/
 
 1. Validate content (check length, sanitize)
 2. Generate unique ID (check for collisions)
-3. Upload to S3 bucket with key: `markdown/{id}.md`
-4. Set appropriate metadata and content-type
-5. Return unique ID and full URL
+3. **Create metadata object:**
+   ```json
+   {
+     "created_at": "ISO 8601 timestamp",
+     "name": "Optional document name",
+     "creator_ip": "Hashed IP address",
+     "is_encrypted": false,
+     "version": "1.0"
+   }
+   ```
+4. **Append metadata to content:**
+   - Convert metadata JSON to base64
+   - Append as LAST line: `<!-- META:${base64Metadata} -->`
+5. Upload to S3 bucket with key: `markdown/{id}.md`
+6. Set appropriate metadata and content-type
+7. Return unique ID and full URL
 
 ### GET /api/fetch/[id]
 
@@ -128,7 +142,11 @@ mrkd/
   "content": "# Markdown content...",
   "metadata": {
     "createdAt": "2025-01-15T10:30:00Z",
-    "size": 1234
+    "size": 1234,
+    "isEncrypted": false,
+    "isEditable": true,
+    "name": "My Document",
+    "version": "1.2"
   }
 }
 ```
@@ -138,7 +156,118 @@ mrkd/
 1. Validate ID format
 2. Fetch from S3 bucket using key: `markdown/{id}.md`
 3. Handle 404 if not found
-4. Return content with metadata
+4. **Extract metadata from last line:**
+   - Check if last line matches `<!-- META:... -->` format
+   - If valid, decode base64 to JSON
+   - Log metadata internally (for future features like analytics)
+5. **Remove last line** (metadata) from content before returning to frontend
+6. Return clean content with public metadata (created_at, size, isEncrypted, isEditable, name, version)
+
+### PUT /api/update/[id]
+
+**Request:**
+
+```json
+{
+  "content": "# Updated markdown content...",
+  "editKey": "user-provided-edit-key",
+  "isEncrypted": false
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "id": "abc123xyz",
+  "message": "Document updated successfully",
+  "version": "1.3"
+}
+```
+
+**Logic:**
+
+1. Validate ID format and content
+2. Verify edit key is provided
+3. Fetch existing document from S3
+4. Extract metadata and verify edit key hash matches
+5. Increment version number (e.g., 1.2 → 1.3, 1.9 → 2.0)
+6. Create updated metadata preserving original fields
+7. Append updated metadata to new content
+8. Overwrite existing document in S3
+9. Return success with new version number
+
+### POST /api/verify-edit-key/[id]
+
+**Request:**
+
+```json
+{
+  "editKey": "user-provided-edit-key"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Edit key verified"
+}
+```
+
+**Logic:**
+
+1. Validate ID format
+2. Fetch document from S3
+3. Extract metadata and check for edit_key_hash
+4. Hash provided edit key and compare with stored hash
+5. Return success/failure without exposing stored hash
+
+## Document Metadata Format
+
+Each markdown document stored in S3 contains embedded metadata at the end:
+
+### Metadata Structure
+
+```json
+{
+  "created_at": "2025-10-18T12:34:56.789Z",
+  "name": "Optional document name",
+  "creator_ip": "SHA-256 hash of IP",
+  "is_encrypted": false,
+  "version": "1.0"
+}
+```
+
+### Storage Format
+
+Metadata is appended to the markdown content as an HTML comment:
+
+```markdown
+# My Document
+
+This is the content...
+
+<!-- META:eyJjcmVhdGVkX2F0IjoiMjAyNS0xMC0xOFQxMjozNDo1Ni43ODlaIiwibmFtZSI6Ik15IERvY3VtZW50IiwiY3JlYXRvcl9pcCI6Imhhc2hlZCIsImlzX2VuY3J5cHRlZCI6ZmFsc2UsInZlcnNpb24iOiIxLjAifQ== -->
+```
+
+### Metadata Fields
+
+- **created_at**: ISO 8601 timestamp of document creation
+- **name**: Optional user-provided document name
+- **creator_ip**: SHA-256 hashed IP address (privacy-preserving)
+- **is_encrypted**: Boolean flag for encryption status
+- **edit_key_hash**: SHA-256 hashed edit key (optional, enables editing)
+- **version**: Document version (starts at "1.0", auto-increments on updates: 1.1, 1.2, ... 1.9, 2.0, etc.)
+
+### Privacy & Security
+
+- IP addresses are hashed using SHA-256 before storage
+- Metadata is not sent to frontend (backend only)
+- Can be used for future features: analytics, moderation, owner verification
+- **Simple validation**: Only the last line is checked for metadata
 
 ## AWS S3 Configuration
 
@@ -292,6 +421,49 @@ Features:
    - Use lightweight markdown parser
    - Tree-shake unused dependencies
 
+## Encryption Feature
+
+### Symmetric Key-Based Encryption
+
+Users can optionally encrypt their markdown with a password/key.
+
+### How It Works
+
+**When Creating:**
+1. User writes markdown content
+2. (Optional) Enters an encryption key/password
+3. If key provided:
+   - Content is encrypted using AES-256-GCM with key
+   - `is_encrypted: true` set in metadata
+   - Encrypted content stored in S3
+4. Share link generated as normal
+
+**When Viewing:**
+1. User opens share link
+2. Backend detects `is_encrypted: true` in metadata
+3. Frontend shows password prompt
+4. User enters decryption key
+5. Client-side decryption using Web Crypto API
+6. Decrypted markdown rendered
+
+### Implementation Details
+
+- **Algorithm**: AES-256-GCM (authenticated encryption)
+- **Key Derivation**: PBKDF2 with SHA-256 (100,000 iterations)
+- **Salt**: Random 16-byte salt stored with encrypted data
+- **IV**: Random 12-byte initialization vector per encryption
+- **Format**: `${salt}:${iv}:${encryptedContent}` (all base64)
+- **Client-Side Only**: Encryption/decryption happens in browser
+- **Zero-Knowledge**: Server never sees the encryption key
+
+### Security Features
+
+✅ **Authenticated encryption** prevents tampering
+✅ **Random salt & IV** ensures unique ciphertexts
+✅ **Key stretching** (PBKDF2) protects against brute force
+✅ **Client-side crypto** - server never sees key
+✅ **No key recovery** - if key lost, content is unrecoverable
+
 ## Additional Features (Optional Enhancements)
 
 1. **Expiration Links**
@@ -299,28 +471,23 @@ Features:
    - Auto-delete after 7/30/90 days
    - User-selectable expiration
 
-2. **Password Protection**
-
-   - Encrypt content with user password
-   - Store encrypted version in S3
-
-3. **Edit Links**
+2. **Edit Links**
 
    - Generate separate edit token
    - Allow editing with special URL
 
-4. **Analytics**
+3. **Analytics**
 
    - Track view counts
    - Store in DynamoDB or S3 metadata
 
-5. **Export Options**
+4. **Export Options**
 
    - Download as .md file
    - Export to PDF
    - Copy HTML
 
-6. **Collections**
+5. **Collections**
    - User accounts (optional)
    - Organize multiple pastes
    - Private/public toggle

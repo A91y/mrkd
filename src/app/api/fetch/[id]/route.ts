@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchFromS3, isS3Configured } from '@/lib/s3';
-import { validateId } from '@/lib/utils';
+import { validateId, extractMetadata } from '@/lib/utils';
 import { MESSAGES } from '@/lib/constants';
 
 export async function GET(
@@ -47,11 +47,34 @@ export async function GET(
       );
     }
 
+    // Extract and strip metadata from content
+    const { content: cleanContent, metadata: docMetadata } = extractMetadata(result.content || '');
+
+    // Log metadata for backend use (analytics, moderation, etc.)
+    if (docMetadata) {
+      console.log('Document metadata:', {
+        id,
+        created_at: docMetadata.created_at,
+        has_name: !!docMetadata.name,
+        version: docMetadata.version,
+        // Don't log full metadata to avoid leaking IP hashes in logs
+      });
+    }
+
+    // Return clean content (without metadata) to frontend
+    // Only include basic metadata (created_at, size, encryption flag, editability, and version)
     return NextResponse.json(
       {
         success: true,
-        content: result.content,
-        metadata: result.metadata,
+        content: cleanContent,
+        metadata: {
+          createdAt: docMetadata?.created_at || result.metadata?.createdAt,
+          size: result.metadata?.size,
+          isEncrypted: docMetadata?.is_encrypted || false,
+          isEditable: !!docMetadata?.edit_key_hash,
+          name: docMetadata?.name,
+          version: docMetadata?.version || '1.0',
+        },
       },
       { status: 200 }
     );

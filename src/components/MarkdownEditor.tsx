@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { MarkdownEditorProps } from '@/types';
-import { getTextStats, debounce } from '@/lib/utils';
-import { STORAGE_KEYS, AUTOSAVE_DELAY } from '@/lib/constants';
-import MarkdownPreview from './MarkdownPreview';
+import { useEffect, useRef, useState } from "react";
+import { MarkdownEditorProps } from "@/types";
+import { getTextStats, debounce } from "@/lib/utils";
+import { STORAGE_KEYS, AUTOSAVE_DELAY } from "@/lib/constants";
+import MarkdownPreview from "./MarkdownPreview";
 
 export default function MarkdownEditor({
   value,
@@ -15,6 +15,11 @@ export default function MarkdownEditor({
   const [showPreview, setShowPreview] = useState(false);
   const [stats, setStats] = useState({ characters: 0, words: 0 });
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  const [showEncryption, setShowEncryption] = useState(false);
+  const [encryptionKey, setEncryptionKey] = useState("");
+  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+  const [documentName, setDocumentName] = useState("");
+  const [editKey, setEditKey] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -36,25 +41,26 @@ export default function MarkdownEditor({
 
   // Handle tab key in textarea
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
+    if (e.key === "Tab") {
       e.preventDefault();
       const start = e.currentTarget.selectionStart;
       const end = e.currentTarget.selectionEnd;
-      const newValue = value.substring(0, start) + '  ' + value.substring(end);
+      const newValue = value.substring(0, start) + "  " + value.substring(end);
       onChange(newValue);
 
       // Set cursor position after the inserted spaces
       setTimeout(() => {
         if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
+          textareaRef.current.selectionStart =
+            textareaRef.current.selectionEnd = start + 2;
         }
       }, 0);
     }
   };
 
   const handleClear = () => {
-    if (confirm('Are you sure you want to clear the editor?')) {
-      onChange('');
+    if (confirm("Are you sure you want to clear the editor?")) {
+      onChange("");
       localStorage.removeItem(STORAGE_KEYS.DRAFT);
     }
   };
@@ -72,8 +78,8 @@ export default function MarkdownEditor({
       // Scroll to preview after a short delay (to allow preview to render)
       setTimeout(() => {
         previewRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
+          behavior: "smooth",
+          block: "start",
         });
 
         // Hide indicator after scroll animation completes
@@ -82,6 +88,10 @@ export default function MarkdownEditor({
         }, 2000);
       }, 100);
     }
+  };
+
+  const handleShareClick = () => {
+    onShare(encryptionKey || undefined, documentName || undefined, editKey || undefined);
   };
 
   return (
@@ -98,7 +108,25 @@ export default function MarkdownEditor({
             onClick={handlePreviewToggle}
             className="px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all border border-border/50"
           >
-            {showPreview ? 'Hide Preview' : 'Show Preview'}
+            {showPreview ? "Hide Preview" : "Show Preview"}
+          </button>
+          <button
+            onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
+            className={`px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all border border-border/50 ${
+              showAdditionalInfo ? "ring-2 ring-accent/50" : ""
+            }`}
+            title="Document name and edit key"
+          >
+            ⚙️
+          </button>
+          <button
+            onClick={() => setShowEncryption(!showEncryption)}
+            className={`px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all border border-border/50 ${
+              showEncryption ? "ring-2 ring-accent/50" : ""
+            }`}
+            title="Encrypt with password"
+          >
+            🔒
           </button>
           <button
             onClick={handleClear}
@@ -108,17 +136,78 @@ export default function MarkdownEditor({
             Clear
           </button>
           <button
-            onClick={onShare}
+            onClick={handleShareClick}
             disabled={!value || isUploading}
             className="px-6 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-glow"
           >
-            {isUploading ? 'Sharing...' : 'Share'}
+            {isUploading ? "Sharing..." : "Share ✨"}
           </button>
         </div>
       </div>
 
+      {/* Additional Info */}
+      {showAdditionalInfo && (
+        <div className="mb-6 glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              📝 Document Name (Optional)
+            </label>
+            <input
+              type="text"
+              value={documentName}
+              onChange={(e) => setDocumentName(e.target.value)}
+              placeholder="My awesome markdown document"
+              className="w-full px-4 py-2 glass border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Give your document a name for easy identification
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              🔑 Edit Key (Optional)
+            </label>
+            <input
+              type="password"
+              value={editKey}
+              onChange={(e) => setEditKey(e.target.value)}
+              placeholder="Enter a key to enable editing later"
+              className="w-full px-4 py-2 glass border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Set an edit key to update this document later. Keep it safe!
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Encryption Input */}
+      {showEncryption && (
+        <div className="mb-6 glass-strong p-4 rounded-2xl border border-border/50">
+          <label className="block text-sm font-medium mb-2">
+            🔒 Encryption Password (Optional)
+          </label>
+          <input
+            type="password"
+            value={encryptionKey}
+            onChange={(e) => setEncryptionKey(e.target.value)}
+            placeholder="Enter password to encrypt your markdown"
+            className="w-full px-4 py-2 glass border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Your content will be encrypted in your browser. Keep this password
+            safe - it cannot be recovered!
+          </p>
+        </div>
+      )}
+
       {/* Editor/Preview */}
-      <div className={`grid gap-6 ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+      <div
+        className={`grid gap-6 ${
+          showPreview ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
+        }`}
+      >
         {/* Editor */}
         <div className="relative group">
           <textarea
@@ -126,16 +215,18 @@ export default function MarkdownEditor({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="# Start writing your markdown here...
-
-You can use:
-- **Bold** and *italic* text
-- Lists and checkboxes
-- Code blocks
-- Tables
-- And much more!
-
-Click 'Share ✨' when you're ready to create a link."
+            placeholder={[
+              "# Start writing your markdown here...",
+              "",
+              "You can use:",
+              "- **Bold** and *italic* text",
+              "- Lists and checkboxes",
+              "- Code blocks",
+              "- Tables",
+              "- And much more!",
+              "",
+              "Click 'Share ✨' when you're ready to create a link.",
+            ].join("\n")}
             className="w-full h-[600px] p-6 glass-strong border border-border/50 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm leading-relaxed transition-all placeholder:text-muted-foreground/50"
             spellCheck="false"
           />
@@ -173,17 +264,22 @@ Click 'Share ✨' when you're ready to create a link."
                   </div>
                   {/* Sparkle effect */}
                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping"></div>
-                  <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
+                  <div
+                    className="absolute -bottom-1 -left-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping"
+                    style={{ animationDelay: "0.3s" }}
+                  ></div>
                 </div>
               </div>
             )}
 
             {/* Preview border glow animation on small screens */}
-            <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-1000 lg:hidden ${
-              showScrollIndicator
-                ? 'opacity-100 ring-2 ring-purple-500/50 ring-offset-2 ring-offset-transparent'
-                : 'opacity-0'
-            }`}></div>
+            <div
+              className={`absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-1000 lg:hidden ${
+                showScrollIndicator
+                  ? "opacity-100 ring-2 ring-purple-500/50 ring-offset-2 ring-offset-transparent"
+                  : "opacity-0"
+              }`}
+            ></div>
 
             <div className="absolute top-4 right-4 glass px-3 py-1 rounded-full text-xs font-medium border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               Preview
@@ -197,7 +293,7 @@ Click 'Share ✨' when you're ready to create a link."
       {/* Help text */}
       <div className="mt-6 glass p-4 rounded-2xl border border-border/50 text-center">
         <p className="text-sm text-muted-foreground">
-          Supports{' '}
+          Supports{" "}
           <a
             href="https://github.github.com/gfm/"
             target="_blank"
@@ -206,9 +302,9 @@ Click 'Share ✨' when you're ready to create a link."
           >
             GitHub Flavored Markdown
           </a>
-          {' · '}
+          {" · "}
           Auto-saves locally as you type
-          {' · '}
+          {" · "}
           No signup required
         </p>
       </div>
