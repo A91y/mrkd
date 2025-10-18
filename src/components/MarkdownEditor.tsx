@@ -87,23 +87,22 @@ export default function MarkdownEditor({
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap glass-strong p-4 rounded-2xl border border-border/50">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">mrkd</h1>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm font-medium glass px-3 py-1.5 rounded-full border border-border/50">
             {stats.characters} chars · {stats.words} words
           </span>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handlePreviewToggle}
-            className="px-4 py-2 text-sm font-medium bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all border border-border/50"
           >
             {showPreview ? 'Hide Preview' : 'Show Preview'}
           </button>
           <button
             onClick={handleClear}
-            className="px-4 py-2 text-sm font-medium text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all border border-border/50"
             disabled={isUploading}
           >
             Clear
@@ -111,7 +110,7 @@ export default function MarkdownEditor({
           <button
             onClick={onShare}
             disabled={!value || isUploading}
-            className="px-6 py-2 text-sm font-medium text-white bg-accent hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+            className="px-6 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent/90 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-glow"
           >
             {isUploading ? 'Sharing...' : 'Share'}
           </button>
@@ -119,9 +118,9 @@ export default function MarkdownEditor({
       </div>
 
       {/* Editor/Preview */}
-      <div className={`grid gap-4 ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+      <div className={`grid gap-6 ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
         {/* Editor */}
-        <div className="relative">
+        <div className="relative group">
           <textarea
             ref={textareaRef}
             value={value}
@@ -136,17 +135,20 @@ You can use:
 - Tables
 - And much more!
 
-Click 'Share' when you're ready to create a link."
-            className="w-full h-[600px] p-6 bg-background border border-muted rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent font-mono text-sm leading-relaxed"
+Click 'Share ✨' when you're ready to create a link."
+            className="w-full h-[600px] p-6 glass-strong border border-border/50 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm leading-relaxed transition-all placeholder:text-muted-foreground/50"
             spellCheck="false"
           />
+          <div className="absolute top-4 right-4 glass px-3 py-1 rounded-full text-xs font-medium border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            Editor
+          </div>
         </div>
 
         {/* Preview */}
         {showPreview && (
           <div
             ref={previewRef}
-            className="relative h-[600px] overflow-auto p-6 bg-background border border-muted rounded-lg scroll-mt-4"
+            className="relative h-[600px] overflow-auto p-6 glass-strong border border-border/50 rounded-2xl scroll-mt-4 group"
           >
             {/* Scroll Indicator - Only shows on small screens */}
             {showScrollIndicator && (
@@ -177,11 +179,15 @@ Click 'Share' when you're ready to create a link."
             )}
 
             {/* Preview border glow animation on small screens */}
-            <div className={`absolute inset-0 rounded-lg pointer-events-none transition-opacity duration-1000 lg:hidden ${
+            <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-1000 lg:hidden ${
               showScrollIndicator
-                ? 'opacity-100 ring-2 ring-accent ring-offset-2 ring-offset-background'
+                ? 'opacity-100 ring-2 ring-purple-500/50 ring-offset-2 ring-offset-transparent'
                 : 'opacity-0'
             }`}></div>
+
+            <div className="absolute top-4 right-4 glass px-3 py-1 rounded-full text-xs font-medium border border-border/50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              Preview
+            </div>
 
             <MarkdownPreview content={value} />
           </div>
@@ -189,18 +195,21 @@ Click 'Share' when you're ready to create a link."
       </div>
 
       {/* Help text */}
-      <div className="mt-4 text-sm text-muted-foreground text-center">
-        <p>
+      <div className="mt-6 glass p-4 rounded-2xl border border-border/50 text-center">
+        <p className="text-sm text-muted-foreground">
           Supports{' '}
           <a
             href="https://github.github.com/gfm/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent hover:underline"
+            className="text-accent hover:underline transition-all"
           >
             GitHub Flavored Markdown
           </a>
-          . Your content is saved locally as you type.
+          {' · '}
+          Auto-saves locally as you type
+          {' · '}
+          No signup required
         </p>
       </div>
     </div>

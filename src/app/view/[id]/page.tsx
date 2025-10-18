@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownViewer from '@/components/MarkdownViewer';
 import ThemeToggle from '@/components/ThemeToggle';
+import GalaxyBackground from '@/components/GalaxyBackground';
 import { validateId } from '@/lib/utils';
 import type { FetchResponse } from '@/types';
 
@@ -44,12 +45,15 @@ export default async function ViewPage({ params }: ViewPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground relative flex flex-col">
+      {/* Galaxy Background */}
+      <GalaxyBackground />
+      
       {/* Header */}
-      <header className="border-b border-muted">
+      <header className="glass border-b border-border/50 sticky top-0 z-30 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold hover:text-accent transition-colors">
+            <Link href="/" className="text-2xl font-bold text-foreground hover:text-accent transition-colors">
               mrkd
             </Link>
             <p className="text-sm text-muted-foreground hidden sm:block">
@@ -61,12 +65,12 @@ export default async function ViewPage({ params }: ViewPageProps) {
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 flex-1">
         <MarkdownViewer content={result.content} />
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-muted mt-16">
+      <footer className="glass border-t border-border/50 mt-16 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
           <p>
             Made with 💖 by{' '}
@@ -74,7 +78,7 @@ export default async function ViewPage({ params }: ViewPageProps) {
               href="https://ayushagr.me"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:underline"
+              className="text-accent hover:underline transition-all"
             >
               Ayush
             </a>
@@ -83,7 +87,7 @@ export default async function ViewPage({ params }: ViewPageProps) {
               href="https://github.com/A91y/mrkd"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:underline"
+              className="text-accent hover:underline transition-all"
             >
               View Source
             </a>

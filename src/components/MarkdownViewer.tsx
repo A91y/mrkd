@@ -13,13 +13,15 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Action buttons */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Shared Markdown</h1>
+      <div className="flex items-center justify-between mb-6 glass-strong p-4 rounded-2xl border border-border/50">
+        <h1 className="text-2xl font-bold text-foreground">
+          Shared Markdown
+        </h1>
         <div className="flex items-center gap-3">
           <CopyButton text={content} label="Copy Source" />
           <Link
             href="/"
-            className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors"
+            className="px-5 py-2 text-sm font-semibold text-white bg-accent hover:bg-accent/90 rounded-xl hover-glow transition-all"
           >
             Create Your Own
           </Link>
@@ -27,7 +29,7 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
       </div>
 
       {/* Markdown content */}
-      <div className="bg-background border border-muted rounded-lg p-8 shadow-sm">
+      <div className="glass-strong border border-border/50 rounded-2xl p-8 glow">
         <article className="prose prose-slate dark:prose-invert max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
@@ -113,12 +115,12 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
       </div>
 
       {/* Print-friendly note */}
-      <div className="mt-6 text-center text-sm text-muted-foreground print:hidden">
+      <div className="mt-6 text-center print:hidden">
         <button
           onClick={() => window.print()}
-          className="hover:text-foreground transition-colors"
+          className="glass px-6 py-3 rounded-xl text-sm font-medium hover-glow transition-all border border-border/50"
         >
-          Print this page
+          🖨️ Print this page
         </button>
       </div>
     </div>

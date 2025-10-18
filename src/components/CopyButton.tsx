@@ -18,13 +18,13 @@ export default function CopyButton({ text, label = 'Copy' }: CopyButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors duration-200"
+      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium glass hover-glow rounded-xl transition-all duration-200 border border-border/50"
       aria-label={label}
     >
       {copied ? (
         <>
           <svg
-            className="w-4 h-4 text-green-500"
+            className="w-4 h-4 text-green-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
