@@ -1,8 +1,8 @@
 // GET /api/fetch/[id] - Fetch markdown content from S3
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchFromS3, isS3Configured } from '@/lib/s3';
-import { validateId, extractMetadata } from '@/lib/utils';
+import { fetchFromS3, deleteFromS3, isS3Configured } from '@/lib/s3';
+import { validateId, extractMetadata, isExpired } from '@/lib/utils';
 import { MESSAGES } from '@/lib/constants';
 
 export async function GET(
@@ -50,6 +50,22 @@ export async function GET(
     // Extract and strip metadata from content
     const { content: cleanContent, metadata: docMetadata } = extractMetadata(result.content || '');
 
+    // Check if document has expired
+    if (docMetadata && isExpired(docMetadata.expires_at)) {
+      console.log(`Document ${id} has expired, deleting...`);
+      
+      // Delete the expired document
+      await deleteFromS3(id);
+      
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This document has expired and has been deleted',
+        },
+        { status: 410 } // 410 Gone
+      );
+    }
+
     // Log metadata for backend use (analytics, moderation, etc.)
     if (docMetadata) {
       console.log('Document metadata:', {
@@ -57,6 +73,7 @@ export async function GET(
         created_at: docMetadata.created_at,
         has_name: !!docMetadata.name,
         version: docMetadata.version,
+        expires_at: docMetadata.expires_at,
         // Don't log full metadata to avoid leaking IP hashes in logs
       });
     }

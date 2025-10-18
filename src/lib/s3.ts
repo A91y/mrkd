@@ -1,6 +1,6 @@
 // S3 client utilities
 
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { S3_CONFIG } from './constants';
 
 // Initialize S3 client
@@ -107,6 +107,27 @@ async function streamToString(stream: unknown): Promise<string> {
   }
 
   return Buffer.concat(chunks).toString('utf-8');
+}
+
+/**
+ * Delete markdown content from S3
+ */
+export async function deleteFromS3(id: string): Promise<boolean> {
+  try {
+    const key = `${S3_CONFIG.FOLDER_PREFIX}${id}.md`;
+
+    const command = new DeleteObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+    console.log(`Deleted expired document: ${id}`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting from S3:', error);
+    return false;
+  }
 }
 
 /**

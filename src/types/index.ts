@@ -47,7 +47,7 @@ export interface ThemeToggleProps {
 export interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onShare: (encryptionKey?: string, documentName?: string, editKey?: string) => void;
+  onShare: (encryptionKey?: string, documentName?: string, editKey?: string, expirationDays?: number) => void;
   isUploading?: boolean;
 }
 

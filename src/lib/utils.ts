@@ -143,6 +143,7 @@ export interface DocumentMetadata {
   creator_ip: string;
   is_encrypted: boolean;
   edit_key_hash?: string;
+  expires_at?: string; // ISO 8601 timestamp
   version: string;
 }
 
@@ -185,6 +186,23 @@ export function incrementVersion(version: string): string {
   }
   
   return `${major}.${minor}`;
+}
+
+/**
+ * Calculate expiration date from now
+ */
+export function calculateExpirationDate(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+/**
+ * Check if document has expired
+ */
+export function isExpired(expiresAt?: string): boolean {
+  if (!expiresAt) return false;
+  return new Date(expiresAt) < new Date();
 }
 
 /**

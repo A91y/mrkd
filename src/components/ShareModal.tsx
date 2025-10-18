@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShareModalProps } from '@/types';
 import { copyToClipboard } from '@/lib/utils';
+import QRCode from 'qrcode';
 
 export default function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleCopy = async () => {
     const success = await copyToClipboard(shareUrl);
@@ -14,6 +17,35 @@ export default function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProp
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  // Generate QR code when modal opens
+  useEffect(() => {
+    if (isOpen && shareUrl && canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, shareUrl, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      }, (error) => {
+        if (error) console.error('QR Code generation error:', error);
+      });
+
+      // Also generate data URL for download
+      QRCode.toDataURL(shareUrl, {
+        width: 400,
+        margin: 2,
+      }).then(url => setQrCodeUrl(url));
+    }
+  }, [isOpen, shareUrl]);
+
+  const downloadQRCode = () => {
+    const link = document.createElement('a');
+    link.href = qrCodeUrl;
+    link.download = 'mrkd-qr-code.png';
+    link.click();
   };
 
   // Close modal on escape key
@@ -157,6 +189,26 @@ export default function ShareModal({ isOpen, onClose, shareUrl }: ShareModalProp
                       </svg>
                     )}
                   </motion.button>
+                </div>
+              </div>
+
+              {/* QR Code */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold mb-3 text-muted-foreground text-center">
+                  Scan to Share
+                </label>
+                <div className="flex flex-col items-center gap-3 p-4 glass rounded-2xl border border-border/50">
+                  <canvas 
+                    ref={canvasRef}
+                    className="rounded-lg"
+                  />
+                  <button
+                    onClick={downloadQRCode}
+                    disabled={!qrCodeUrl}
+                    className="px-4 py-2 text-sm glass hover-glow rounded-xl transition-all border border-border/50 disabled:opacity-50"
+                  >
+                    Download QR Code
+                  </button>
                 </div>
               </div>
 

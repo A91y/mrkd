@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { MarkdownEditorProps } from "@/types";
 import { getTextStats, debounce } from "@/lib/utils";
 import { STORAGE_KEYS, AUTOSAVE_DELAY } from "@/lib/constants";
@@ -20,8 +20,19 @@ export default function MarkdownEditor({
   const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
   const [documentName, setDocumentName] = useState("");
   const [editKey, setEditKey] = useState("");
+  const [expirationDays, setExpirationDays] = useState(30);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [isExpirationOpen, setIsExpirationOpen] = useState(false);
+  const expirationDropdownRef = useRef<HTMLDivElement>(null);
+  const expirationOptions = [
+    { label: "1 Day", value: 1 },
+    { label: "7 Days", value: 7 },
+    { label: "30 Days (Default)", value: 30 },
+    { label: "90 Days", value: 90 },
+    { label: "1 Year", value: 365 },
+    { label: "Never", value: -1 },
+  ];
 
   // Update stats when value changes
   useEffect(() => {
@@ -66,7 +77,7 @@ export default function MarkdownEditor({
   };
 
   // Handle preview toggle with smooth scroll on mobile
-  const handlePreviewToggle = () => {
+  const handlePreviewToggle = useCallback(() => {
     const newShowPreview = !showPreview;
     setShowPreview(newShowPreview);
 
@@ -88,11 +99,135 @@ export default function MarkdownEditor({
         }, 2000);
       }, 100);
     }
-  };
+  }, [showPreview]);
 
-  const handleShareClick = () => {
-    onShare(encryptionKey || undefined, documentName || undefined, editKey || undefined);
-  };
+  const handleShareClick = useCallback(() => {
+    onShare(
+      encryptionKey || undefined,
+      documentName || undefined,
+      editKey || undefined,
+      expirationDays
+    );
+  }, [onShare, encryptionKey, documentName, editKey, expirationDays]);
+
+  const insertFormatting = useCallback(
+    (before: string, after: string, placeholder: string) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const selectedText = value.substring(start, end);
+      const textToInsert = selectedText || placeholder;
+      const newValue =
+        value.substring(0, start) +
+        before +
+        textToInsert +
+        after +
+        value.substring(end);
+
+      onChange(newValue);
+
+      // Set cursor position
+      setTimeout(() => {
+        if (selectedText) {
+          textarea.selectionStart = start + before.length;
+          textarea.selectionEnd = start + before.length + selectedText.length;
+        } else {
+          textarea.selectionStart = start + before.length;
+          textarea.selectionEnd = start + before.length + placeholder.length;
+        }
+        textarea.focus();
+      }, 0);
+    },
+    [value, onChange]
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      // Cmd/Ctrl + S: Share
+      if (modKey && e.key === "s") {
+        e.preventDefault();
+        if (value && !isUploading) {
+          handleShareClick();
+        }
+      }
+
+      // Cmd/Ctrl + P: Toggle Preview
+      if (modKey && e.key === "p") {
+        e.preventDefault();
+        handlePreviewToggle();
+      }
+
+      // Cmd/Ctrl + B: Bold (when textarea is focused)
+      if (
+        modKey &&
+        e.key === "b" &&
+        document.activeElement === textareaRef.current
+      ) {
+        e.preventDefault();
+        insertFormatting("**", "**", "bold text");
+      }
+
+      // Cmd/Ctrl + I: Italic (when textarea is focused)
+      if (
+        modKey &&
+        e.key === "i" &&
+        document.activeElement === textareaRef.current
+      ) {
+        e.preventDefault();
+        insertFormatting("*", "*", "italic text");
+      }
+
+      // Cmd/Ctrl + K: Link (when textarea is focused)
+      if (
+        modKey &&
+        e.key === "k" &&
+        document.activeElement === textareaRef.current
+      ) {
+        e.preventDefault();
+        insertFormatting("[", "](url)", "link text");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    value,
+    isUploading,
+    showPreview,
+    handlePreviewToggle,
+    handleShareClick,
+    insertFormatting,
+  ]);
+
+  // Close expiration dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isExpirationOpen &&
+        expirationDropdownRef.current &&
+        !expirationDropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsExpirationOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isExpirationOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsExpirationOpen(false);
+    };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, []);
 
   return (
     <div className="w-full max-w-6xl mx-auto">
@@ -147,7 +282,7 @@ export default function MarkdownEditor({
 
       {/* Additional Info */}
       {showAdditionalInfo && (
-        <div className="mb-6 glass-strong p-4 rounded-2xl border border-border/50 space-y-4">
+        <div className="mb-6 glass-strong p-4 rounded-2xl border border-border/50 space-y-4 relative z-30">
           <div>
             <label className="block text-sm font-medium mb-2">
               📝 Document Name (Optional)
@@ -163,7 +298,7 @@ export default function MarkdownEditor({
               Give your document a name for easy identification
             </p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium mb-2">
               🔑 Edit Key (Optional)
@@ -178,6 +313,69 @@ export default function MarkdownEditor({
             <p className="mt-2 text-xs text-muted-foreground">
               Set an edit key to update this document later. Keep it safe!
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              ⏰ Expiration
+            </label>
+            <div className="relative" ref={expirationDropdownRef}>
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={isExpirationOpen}
+                onClick={() => setIsExpirationOpen((v) => !v)}
+                className="w-full px-4 py-2 pr-10 glass border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all text-foreground flex items-center justify-between"
+              >
+                <span>
+                  {expirationOptions.find((o) => o.value === expirationDays)
+                    ?.label || "Select"}
+                </span>
+                <svg
+                  className={`w-4 h-4 ml-2 transition-transform ${
+                    isExpirationOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {isExpirationOpen && (
+                <div
+                  role="listbox"
+                  className="absolute mt-2 w-full z-50 bg-background border border-border/50 rounded-xl shadow-lg overflow-hidden"
+                >
+                  <ul className="max-h-60 overflow-auto py-1">
+                    {expirationOptions.map((opt) => (
+                      <li
+                        key={opt.value}
+                        role="option"
+                        aria-selected={expirationDays === opt.value}
+                        onClick={() => {
+                          setExpirationDays(opt.value);
+                          setIsExpirationOpen(false);
+                        }}
+                        className={`px-4 py-2 cursor-pointer transition-all ${
+                          expirationDays === opt.value
+                            ? "bg-accent/10 border-l-2 border-accent"
+                            : "hover:bg-muted/30"
+                        }`}
+                      >
+                        {opt.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -46,7 +46,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleShare = async (encryptionKey?: string, documentName?: string, editKey?: string) => {
+  const handleShare = async (encryptionKey?: string, documentName?: string, editKey?: string, expirationDays?: number) => {
     if (!content.trim()) {
       setError('Please enter some content before sharing');
       return;
@@ -111,7 +111,8 @@ export default function Home() {
             content: contentToUpload,
             isEncrypted: !!encryptionKey?.trim(),
             name: documentName?.trim(),
-            editKey: editKey?.trim()
+            editKey: editKey?.trim(),
+            expirationDays: expirationDays || 30
           }),
         });
 

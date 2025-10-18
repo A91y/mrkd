@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToS3, isS3Configured } from '@/lib/s3';
-import { generateId, validateContent, getShareUrl, createMetadata, appendMetadata, hashIP, hashEditKey } from '@/lib/utils';
+import { generateId, validateContent, getShareUrl, createMetadata, appendMetadata, hashIP, hashEditKey, calculateExpirationDate } from '@/lib/utils';
 import { MESSAGES } from '@/lib/constants';
 
 // Simple in-memory rate limiting (use Redis in production)
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { content, name, isEncrypted, editKey } = body;
+    const { content, name, isEncrypted, editKey, expirationDays } = body;
 
     // Validate content
     const validation = validateContent(content);
@@ -84,6 +84,11 @@ export async function POST(request: NextRequest) {
     if (editKey && editKey.trim()) {
       const hashedEditKey = await hashEditKey(editKey.trim());
       metadata.edit_key_hash = hashedEditKey;
+    }
+
+    // Set expiration date if provided and not -1 (never)
+    if (expirationDays && expirationDays !== -1) {
+      metadata.expires_at = calculateExpirationDate(expirationDays);
     }
 
     // Append metadata to content
