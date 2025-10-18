@@ -100,7 +100,16 @@ export default function Home() {
       <footer className="border-t border-muted mt-16">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
           <p>
-            Built with Next.js, Tailwind CSS, and AWS S3 ·{' '}
+            Made with 💖 by{' '}
+            <a
+              href="https://ayushagr.me"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline"
+            >
+              Ayush
+            </a>
+            {' · '}
             <a
               href="https://github.com/A91y/mrkd"
               target="_blank"
