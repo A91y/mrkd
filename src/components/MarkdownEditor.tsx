@@ -14,7 +14,9 @@ export default function MarkdownEditor({
 }: MarkdownEditorProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [stats, setStats] = useState({ characters: 0, words: 0 });
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Update stats when value changes
   useEffect(() => {
@@ -57,6 +59,31 @@ export default function MarkdownEditor({
     }
   };
 
+  // Handle preview toggle with smooth scroll on mobile
+  const handlePreviewToggle = () => {
+    const newShowPreview = !showPreview;
+    setShowPreview(newShowPreview);
+
+    // On mobile/tablet (below lg breakpoint), scroll to preview and show indicator
+    if (newShowPreview && window.innerWidth < 1024) {
+      // Show scroll indicator immediately
+      setShowScrollIndicator(true);
+
+      // Scroll to preview after a short delay (to allow preview to render)
+      setTimeout(() => {
+        previewRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+
+        // Hide indicator after scroll animation completes
+        setTimeout(() => {
+          setShowScrollIndicator(false);
+        }, 2000);
+      }, 100);
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* Toolbar */}
@@ -69,7 +96,7 @@ export default function MarkdownEditor({
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowPreview(!showPreview)}
+            onClick={handlePreviewToggle}
             className="px-4 py-2 text-sm font-medium bg-muted hover:bg-muted/80 rounded-lg transition-colors"
           >
             {showPreview ? 'Hide Preview' : 'Show Preview'}
@@ -117,7 +144,45 @@ Click 'Share' when you're ready to create a link."
 
         {/* Preview */}
         {showPreview && (
-          <div className="h-[600px] overflow-auto p-6 bg-background border border-muted rounded-lg">
+          <div
+            ref={previewRef}
+            className="relative h-[600px] overflow-auto p-6 bg-background border border-muted rounded-lg scroll-mt-4"
+          >
+            {/* Scroll Indicator - Only shows on small screens */}
+            {showScrollIndicator && (
+              <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-10 lg:hidden">
+                <div className="relative animate-bounce">
+                  {/* Floating badge */}
+                  <div className="bg-accent text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg flex items-center gap-2 whitespace-nowrap">
+                    <span>Preview below</span>
+                    <svg
+                      className="w-4 h-4 animate-pulse"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                      />
+                    </svg>
+                  </div>
+                  {/* Sparkle effect */}
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping"></div>
+                  <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-yellow-300 rounded-full animate-ping" style={{ animationDelay: '0.3s' }}></div>
+                </div>
+              </div>
+            )}
+
+            {/* Preview border glow animation on small screens */}
+            <div className={`absolute inset-0 rounded-lg pointer-events-none transition-opacity duration-1000 lg:hidden ${
+              showScrollIndicator
+                ? 'opacity-100 ring-2 ring-accent ring-offset-2 ring-offset-background'
+                : 'opacity-0'
+            }`}></div>
+
             <MarkdownPreview content={value} />
           </div>
         )}
