@@ -14,7 +14,7 @@ export default function MarkdownPreview({ content }: MarkdownPreviewProps) {
         rehypePlugins={[rehypeHighlight]}
         components={{
           // Custom code block with copy button
-          code: ({ node, className, children, ...props }) => {
+          code: ({ className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match;
 

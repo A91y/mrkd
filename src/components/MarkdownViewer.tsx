@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -15,12 +17,12 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
         <h1 className="text-2xl font-bold">Shared Markdown</h1>
         <div className="flex items-center gap-3">
           <CopyButton text={content} label="Copy Source" />
-          <a
+          <Link
             href="/"
             className="px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-accent/90 rounded-lg transition-colors"
           >
             Create Your Own
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -32,34 +34,54 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
             rehypePlugins={[rehypeHighlight]}
             components={{
               // Add copy button to code blocks
-              pre: ({ node, children, ...props }) => {
+              pre: ({ children, ...props }) => {
                 return (
                   <div className="relative group">
                     <pre {...props}>{children}</pre>
                   </div>
                 );
               },
-              // Handle images
-              img: ({ node, ...props }) => {
-                return (
-                  <img
-                    {...props}
-                    className="rounded-lg shadow-md"
-                    loading="lazy"
-                    alt={props.alt || 'Image'}
-                  />
-                );
+              // Handle images with Next.js Image component
+              img: ({ src, alt, ...props }) => {
+                if (!src) return null;
+                // For external images, use regular img tag
+                if (typeof src === 'string' && src.startsWith('http')) {
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={src}
+                      alt={alt || 'Image'}
+                      {...props}
+                      className="rounded-lg shadow-md"
+                      loading="lazy"
+                    />
+                  );
+                }
+                // For local images, use Next.js Image (only if src is a string)
+                if (typeof src === 'string') {
+                  return (
+                    <Image
+                      src={src}
+                      alt={alt || 'Image'}
+                      width={800}
+                      height={600}
+                      className="rounded-lg shadow-md"
+                    />
+                  );
+                }
+                // Fallback for non-string src
+                return null;
               },
               // Style tables
-              table: ({ node, ...props }) => {
+              table: ({ children, ...props }) => {
                 return (
                   <div className="overflow-x-auto">
-                    <table {...props} />
+                    <table {...props}>{children}</table>
                   </div>
                 );
               },
               // Add anchor links to headings
-              h1: ({ node, children, ...props }) => {
+              h1: ({ children, ...props }) => {
                 const id = String(children).toLowerCase().replace(/\s+/g, '-');
                 return (
                   <h1 id={id} {...props}>
@@ -67,7 +89,7 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
                   </h1>
                 );
               },
-              h2: ({ node, children, ...props }) => {
+              h2: ({ children, ...props }) => {
                 const id = String(children).toLowerCase().replace(/\s+/g, '-');
                 return (
                   <h2 id={id} {...props}>
@@ -75,7 +97,7 @@ export default function MarkdownViewer({ content }: MarkdownViewerProps) {
                   </h2>
                 );
               },
-              h3: ({ node, children, ...props }) => {
+              h3: ({ children, ...props }) => {
                 const id = String(children).toLowerCase().replace(/\s+/g, '-');
                 return (
                   <h3 id={id} {...props}>

@@ -63,7 +63,7 @@ export async function fetchFromS3(id: string): Promise<{
     const response = await s3Client.send(command);
 
     // Convert stream to string
-    const content = await streamToString(response.Body as any);
+    const content = await streamToString(response.Body);
 
     // Extract metadata
     const metadata = {
@@ -76,10 +76,10 @@ export async function fetchFromS3(id: string): Promise<{
       content,
       metadata,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching from S3:', error);
 
-    if (error.name === 'NoSuchKey') {
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'NoSuchKey') {
       return {
         success: false,
         error: 'Content not found',
@@ -96,11 +96,14 @@ export async function fetchFromS3(id: string): Promise<{
 /**
  * Convert stream to string
  */
-async function streamToString(stream: any): Promise<string> {
-  const chunks: Buffer[] = [];
+async function streamToString(stream: unknown): Promise<string> {
+  const chunks: Uint8Array[] = [];
 
-  for await (const chunk of stream) {
-    chunks.push(chunk);
+  // Type guard for async iterable
+  if (stream && typeof stream === 'object' && Symbol.asyncIterator in stream) {
+    for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+      chunks.push(chunk);
+    }
   }
 
   return Buffer.concat(chunks).toString('utf-8');

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import MarkdownViewer from '@/components/MarkdownViewer';
 import ThemeToggle from '@/components/ThemeToggle';
 import { validateId } from '@/lib/utils';
@@ -48,9 +49,9 @@ export default async function ViewPage({ params }: ViewPageProps) {
       <header className="border-b border-muted">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <a href="/" className="text-xl font-bold hover:text-accent transition-colors">
+            <Link href="/" className="text-xl font-bold hover:text-accent transition-colors">
               mrkd
-            </a>
+            </Link>
             <p className="text-sm text-muted-foreground hidden sm:block">
               Simple markdown sharing
             </p>
