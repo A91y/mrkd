@@ -8,8 +8,6 @@ import {
   hashEditKey, 
   extractMetadata, 
   appendMetadata, 
-  createMetadata,
-  hashIP,
   incrementVersion
 } from '@/lib/utils';
 import { MESSAGES } from '@/lib/constants';

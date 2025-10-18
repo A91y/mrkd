@@ -17,7 +17,7 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [error, setError] = useState('');
   const [showHero, setShowHero] = useState(true);
-  const [editSession, setEditSession] = useState<any>(null);
+  const [editSession, setEditSession] = useState<{ id: string; content: string; editKey: string } | null>(null);
 
   // Load draft from localStorage or edit session on mount
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function Home() {
       if (encryptionKey && encryptionKey.trim()) {
         try {
           contentToUpload = await encryptContent(content, encryptionKey.trim());
-        } catch (encryptError) {
+        } catch {
           setError('Failed to encrypt content');
           setIsUploading(false);
           return;

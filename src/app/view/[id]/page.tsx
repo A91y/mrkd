@@ -8,7 +8,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import GalaxyBackground from '@/components/GalaxyBackground';
 import DecryptModal from '@/components/DecryptModal';
 import EditModal from '@/components/EditModal';
-import { validateId, hashEditKey } from '@/lib/utils';
+import { validateId } from '@/lib/utils';
 import { decryptContent } from '@/lib/crypto';
 import type { FetchResponse } from '@/types';
 
