@@ -1,238 +1,180 @@
-'use client';
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import ViewClient from '@/components/ViewClient';
+import { validateId, extractMetadata } from '@/lib/utils';
+import { fetchFromS3 } from '@/lib/s3';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import MarkdownViewer from '@/components/MarkdownViewer';
-import ThemeToggle from '@/components/ThemeToggle';
-import GalaxyBackground from '@/components/GalaxyBackground';
-import DecryptModal from '@/components/DecryptModal';
-import EditModal from '@/components/EditModal';
-import { validateId } from '@/lib/utils';
-import { decryptContent } from '@/lib/crypto';
-import type { FetchResponse } from '@/types';
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default function ViewPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
-  
-  const [content, setContent] = useState<string>('');
-  const [metadata, setMetadata] = useState<FetchResponse['metadata']>();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [showDecryptModal, setShowDecryptModal] = useState(false);
-  const [encryptedContent, setEncryptedContent] = useState<string>('');
-  const [decryptError, setDecryptError] = useState<string>('');
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editError, setEditError] = useState<string>('');
+// Helper function to extract plain text from markdown (first 160 chars)
+function extractPlainText(markdown: string): string {
+  // Remove markdown syntax
+  const plainText = markdown
+    .replace(/^#{1,6}\s+/gm, '') // Remove headers
+    .replace(/\*\*(.+?)\*\*/g, '$1') // Remove bold
+    .replace(/\*(.+?)\*/g, '$1') // Remove italic
+    .replace(/~~(.+?)~~/g, '$1') // Remove strikethrough
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // Remove links
+    .replace(/`(.+?)`/g, '$1') // Remove inline code
+    .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+    .replace(/>\s+/g, '') // Remove blockquotes
+    .replace(/[-*+]\s+/g, '') // Remove list markers
+    .replace(/\n+/g, ' ') // Replace newlines with spaces
+    .trim();
 
-  useEffect(() => {
-    // Validate ID format
-    if (!validateId(id)) {
-      router.push('/404');
-      return;
+  return plainText.substring(0, 180);
+}
+
+// Extract first heading or first line as title
+function extractTitle(markdown: string): string {
+  // Try to find first h1 or h2
+  const h1Match = markdown.match(/^#\s+(.+)$/m);
+  if (h1Match) return h1Match[1];
+
+  const h2Match = markdown.match(/^##\s+(.+)$/m);
+  if (h2Match) return h2Match[1];
+
+  // Fallback to first non-empty line (max 60 chars)
+  const firstLine = markdown.split('\n').find(line => line.trim());
+  if (firstLine) {
+    const cleanLine = firstLine.replace(/^#{1,6}\s+/, '').trim();
+    return cleanLine.substring(0, 60) + (cleanLine.length > 60 ? '...' : '');
+  }
+
+  return 'Shared Markdown Document';
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+
+  // Validate ID format
+  if (!validateId(id)) {
+    return {
+      title: 'Invalid Document - mrkd',
+      description: 'The requested document ID is invalid.',
+    };
+  }
+
+  try {
+    // Fetch content from S3
+    const result = await fetchFromS3(id);
+
+    if (!result.success || !result.content) {
+      return {
+        title: 'Document Not Found - mrkd',
+        description: 'The requested markdown document could not be found.',
+      };
     }
 
-    // Fetch content
-    async function fetchContent() {
-      try {
-        const response = await fetch(`/api/fetch/${id}`);
-        
-        if (!response.ok) {
-          setError('Content not found');
-          setIsLoading(false);
-          return;
-        }
+    // Extract metadata
+    const { content: cleanContent, metadata: docMetadata } = extractMetadata(result.content);
 
-        const result: FetchResponse = await response.json();
-
-        if (!result.success || !result.content) {
-          setError('Failed to load content');
-          setIsLoading(false);
-          return;
-        }
-
-        setMetadata(result.metadata);
-
-        // Check if content is encrypted
-        if (result.metadata?.isEncrypted) {
-          setEncryptedContent(result.content);
-          setShowDecryptModal(true);
-          setIsLoading(false);
-        } else {
-          setContent(result.content);
-          setIsLoading(false);
-        }
-      } catch (err) {
-        console.error('Error fetching markdown:', err);
-        setError('Failed to load content');
-        setIsLoading(false);
-      }
-    }
-
-    fetchContent();
-  }, [id, router]);
-
-  const handleDecrypt = async (password: string) => {
-    try {
-      setDecryptError('');
-      const decrypted = await decryptContent(encryptedContent, password);
-      setContent(decrypted);
-      setShowDecryptModal(false);
-    } catch (err) {
-      console.error('Decryption error:', err);
-      setDecryptError('Failed to decrypt. Wrong password?');
-    }
-  };
-
-  const handleCancelDecrypt = () => {
-    router.push('/');
-  };
-
-  const handleEdit = () => {
-    setShowEditModal(true);
-  };
-
-  const handleConfirmEdit = async (editKey: string) => {
-    try {
-      setEditError('');
-      
-      // Verify edit key by hashing and checking with backend
-      const response = await fetch(`/api/verify-edit-key/${id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+    // If encrypted, don't show preview
+    if (docMetadata?.is_encrypted) {
+      const title = docMetadata?.name || 'Encrypted Document';
+      return {
+        title: `${title} - mrkd`,
+        description: 'This document is encrypted. Enter the password to view its contents.',
+        robots: {
+          index: false,
+          follow: true,
         },
-        body: JSON.stringify({ editKey }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Store edit session info
-        sessionStorage.setItem('editSession', JSON.stringify({
-          id,
-          content,
-          editKey,
-          name: metadata?.name,
-          isEncrypted: metadata?.isEncrypted
-        }));
-        
-        // Redirect to home page in edit mode
-        router.push('/?edit=true');
-      } else {
-        setEditError(result.error || 'Invalid edit key');
-      }
-    } catch (err) {
-      console.error('Edit verification error:', err);
-      setEditError('Failed to verify edit key');
+        openGraph: {
+          title: `${title} - mrkd`,
+          description: 'This document is encrypted. Enter the password to view.',
+          type: 'article',
+          url: `${process.env.NEXT_PUBLIC_BASE_URL}/view/${id}`,
+          siteName: 'mrkd',
+          images: [
+            {
+              url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/og?title=${encodeURIComponent(title)}&author=${encodeURIComponent(docMetadata?.name || 'Anonymous')}&id=${id}&preview=🔒 This document is encrypted`,
+              width: 1200,
+              height: 630,
+              alt: title,
+            },
+          ],
+        },
+        twitter: {
+          card: 'summary_large_image',
+          title: `${title} - mrkd`,
+          description: 'This document is encrypted. Enter the password to view.',
+          images: [`${process.env.NEXT_PUBLIC_BASE_URL}/api/og?title=${encodeURIComponent(title)}&author=${encodeURIComponent(docMetadata?.name || 'Anonymous')}&id=${id}&preview=🔒 This document is encrypted`],
+        },
+      };
     }
-  };
 
-  const handleCancelEdit = () => {
-    setShowEditModal(false);
-    setEditError('');
-  };
+    // Extract title and description from content
+    const title = docMetadata?.name || extractTitle(cleanContent);
+    const description = extractPlainText(cleanContent) || 'View this shared markdown document on mrkd.';
+    const author = docMetadata?.name || 'Anonymous';
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return {
+      title: `${title} - mrkd`,
+      description,
+      keywords: ['markdown', 'document', 'share', 'mrkd', 'preview', 'gist'],
+      authors: [{ name: author }],
+      creator: author,
+      publisher: 'mrkd',
+      alternates: {
+        canonical: `${process.env.NEXT_PUBLIC_BASE_URL}/view/${id}`,
+      },
+      openGraph: {
+        title: `${title} - mrkd`,
+        description,
+        type: 'article',
+        url: `${process.env.NEXT_PUBLIC_BASE_URL}/view/${id}`,
+        siteName: 'mrkd',
+        publishedTime: docMetadata?.created_at,
+        authors: [author],
+        images: [
+          {
+            url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/og?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&id=${id}&preview=${encodeURIComponent(description.substring(0, 150))}`,
+            width: 1200,
+            height: 630,
+            alt: title,
+          },
+        ],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${title} - mrkd`,
+        description,
+        creator: '@A91y',
+        images: [`${process.env.NEXT_PUBLIC_BASE_URL}/api/og?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}&id=${id}&preview=${encodeURIComponent(description.substring(0, 150))}`],
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-video-preview': -1,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        },
+      },
+    };
+  } catch (error) {
+    console.error('Error generating metadata:', error);
+    return {
+      title: 'Error Loading Document - mrkd',
+      description: 'An error occurred while loading this markdown document.',
+    };
+  }
+}
+
+export default async function ViewPage({ params }: PageProps) {
+  const { id } = await params;
+
+  // Validate ID format
+  if (!validateId(id)) {
+    notFound();
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-xl">{error}</p>
-          <Link href="/" className="text-accent hover:underline mt-4 inline-block">
-            Go Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen text-foreground relative flex flex-col">
-      {/* Galaxy Background */}
-      <GalaxyBackground />
-      
-      {/* Header */}
-      <header className="glass border-b border-border/50 sticky top-0 z-30 backdrop-blur-xl">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-2xl font-bold text-foreground hover:text-accent transition-colors">
-              mrkd
-            </Link>
-            <p className="text-sm text-muted-foreground hidden sm:block">
-              Simple markdown sharing
-            </p>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="container mx-auto px-4 py-8 flex-1">
-        <MarkdownViewer 
-          content={content} 
-          metadata={{
-            name: metadata?.name,
-            isEditable: metadata?.isEditable,
-            version: metadata?.version
-          }}
-          onEdit={handleEdit}
-        />
-      </main>
-
-      {/* Decrypt Modal */}
-      <DecryptModal
-        isOpen={showDecryptModal}
-        onDecrypt={handleDecrypt}
-        onCancel={handleCancelDecrypt}
-        error={decryptError}
-      />
-
-      {/* Edit Modal */}
-      <EditModal
-        isOpen={showEditModal}
-        onConfirm={handleConfirmEdit}
-        onCancel={handleCancelEdit}
-        error={editError}
-      />
-
-      {/* Footer */}
-      <footer className="glass border-t border-border/50 mt-16 backdrop-blur-xl">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <p>
-            Made with 💖 by{' '}
-            <a
-              href="https://ayushagr.me"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline transition-all"
-            >
-              Ayush
-            </a>
-            {' · '}
-            <a
-              href="https://github.com/A91y/mrkd"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline transition-all"
-            >
-              View Source
-            </a>
-          </p>
-        </div>
-      </footer>
-    </div>
-  );
+  // For server-side rendering, we can optionally pre-fetch the content
+  // But since we have client-side decryption and other features,
+  // we'll pass the id to the client component and let it handle fetching
+  return <ViewClient id={id} />;
 }

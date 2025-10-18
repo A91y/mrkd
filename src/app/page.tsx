@@ -6,6 +6,7 @@ import MarkdownEditor from '@/components/MarkdownEditor';
 import ShareModal from '@/components/ShareModal';
 import ThemeToggle from '@/components/ThemeToggle';
 import GalaxyBackground from '@/components/GalaxyBackground';
+import HomeStructuredData from '@/components/HomeStructuredData';
 import { STORAGE_KEYS, MESSAGES } from '@/lib/constants';
 import { encryptContent, isCryptoSupported } from '@/lib/crypto';
 import type { UploadResponse } from '@/types';
@@ -140,9 +141,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen text-foreground relative flex flex-col">
-      {/* Galaxy Background */}
-      <GalaxyBackground />
+    <>
+      {/* Structured Data for SEO */}
+      <HomeStructuredData />
+
+      <div className="min-h-screen text-foreground relative flex flex-col">
+        {/* Galaxy Background */}
+        <GalaxyBackground />
       
       {/* Header */}
       <header className="glass border-b border-border/50 sticky top-0 z-30 backdrop-blur-xl">
@@ -234,15 +239,15 @@ export default function Home() {
               transition={{ delay: 0.7 }}
               className="mt-16 flex flex-wrap gap-3 justify-center"
             >
-              {['Live Preview', 'Auto-save', 'Dark Mode', 'GFM Support'].map((feature, index) => (
-                <div
-                  key={feature}
-                  className="glass px-4 py-2 rounded-full text-sm font-medium border border-border/50"
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
-                  {feature}
-                </div>
-              ))}
+            {['Password Protection', 'End-to-End Encryption', 'Live Preview', 'Dark Mode', 'GFM Support'].map((feature, index) => (
+              <div
+                key={feature}
+                className="glass px-4 py-2 rounded-full text-sm font-medium border border-border/50"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                {feature}
+              </div>
+            ))}
             </motion.div>
           </div>
         </motion.section>
@@ -306,6 +311,7 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
